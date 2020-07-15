@@ -3,22 +3,15 @@ pragma solidity ^0.6.6;
 // ----------------------------------------------------------------------------
 // Safe maths
 // ----------------------------------------------------------------------------
-contract SafeMath {
-    function safeAdd(uint256 a, uint256 b) public pure returns (uint256 c) {
-        c = a + b;
-        require(c >= a);
+library SafeMath {
+    function add(uint256 a, uint256 b) public pure returns (uint256) {
+        uint256 c = a + b;
+        assert(c >= a);
+        return c;
     }
-    function safeSub(uint256 a, uint256 b) public pure returns (uint256 c) {
-        require(b <= a);
-        c = a - b;
-    }
-    function safeMul(uint256 a, uint256 b) public pure returns (uint256 c) {
-        c = a * b;
-        require(a == 0 || c / a == b);
-    }
-    function safeDiv(uint256 a, uint256 b) public pure returns (uint256 c) {
-        require(b > 0);
-        c = a / b;
+    function sub(uint256 a, uint256 b) public pure returns (uint256) {
+        assert(b <= a);
+        return a - b;
     }
 }
 
@@ -76,7 +69,9 @@ contract Owned {
     }
 }
 
-contract CMGCoin is ERC20Interface, Owned, SafeMath {
+contract CMGCoin is ERC20Interface, Owned {
+    
+    using SafeMath for uint256;
     
     mapping(address => uint256) balances;
     mapping(address => mapping(address => uint256)) allowed;
@@ -121,72 +116,72 @@ contract CMGCoin is ERC20Interface, Owned, SafeMath {
     }
 
     // ------------------------------------------------------------------------
-    // Get the token balance for account account
+    // Get the token balance for account
     // ------------------------------------------------------------------------
-    function balanceOf(address account) public override view returns (uint256 balance) {
+    function balanceOf(address account) public override view returns (uint256) {
         return balances[account];
     }
 
     // ------------------------------------------------------------------------
-    // Transfer the balance from token owner's account to to account
-    // - Owner's account must have sufficient balance to transfer
+    // Transfer the balance from token owner's account to receiver account
+    // - Token owner's account must have sufficient balance to transfer
     // - 0 value transfers are allowed
     // ------------------------------------------------------------------------
-    function transfer(address to, uint256 amount) public override returns (bool success) {
-        balances[msg.sender] = safeSub(balances[msg.sender], amount);
-        balances[to] = safeAdd(balances[to], amount);
-        emit Transfer(msg.sender, to, amount);
+    function transfer(address receiver, uint256 amount) public override returns (bool) {
+        balances[msg.sender] = balances[msg.sender].sub(amount);
+        balances[receiver] = balances[receiver].add(amount);
+        emit Transfer(msg.sender, receiver, amount);
         return true;
     }
 
     // ------------------------------------------------------------------------
-    // Token owner can approve for spender to transferFrom(...) amount
+    // Token owner can approve for delegate to transferFrom(...) amount
     // from the token owner's account
     //
     // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20-token-standard.md
     // recommends that there are no checks for the approval double-spend attack
     // as this should be implemented in user interfaces 
     // ------------------------------------------------------------------------
-    function approve(address spender, uint256 amount) public override returns (bool success) {
-        allowed[msg.sender][spender] = amount;
-        emit Approval(msg.sender, spender, amount);
+    function approve(address delegate, uint256 amount) public override returns (bool) {
+        allowed[msg.sender][delegate] = amount;
+        emit Approval(msg.sender, delegate, amount);
         return true;
+    }
+    
+    // ------------------------------------------------------------------------
+    // Returns the amount approved by the tokenOwner that can be transferred 
+    // to the delegate's account
+    // ------------------------------------------------------------------------
+    function allowance(address tokenOwner, address delegate) public override view returns (uint256) {
+        return allowed[tokenOwner][delegate];
     }
 
     // ------------------------------------------------------------------------
-    // Transfer amount from the from account to the to account
+    // Transfer amount from the tokenOwner's account to the receiver's account
     // 
     // The calling account must already have sufficient amount approve(...)-d
-    // for spending from the from account and
-    // - From account must have sufficient balance to transfer
-    // - Spender must have sufficient allowance to transfer
+    // for spending from the tokenOwner's account and
+    // - tokenOwner must have sufficient balance to transfer
+    // - delegate must have sufficient allowance to transfer
     // - 0 value transfers are allowed
     // ------------------------------------------------------------------------
-    function transferFrom(address account, address to, uint256 amount) public override returns (bool success) {
-        balances[account] = safeSub(balances[account], amount);
-        allowed[account][msg.sender] = safeSub(allowed[account][msg.sender], amount);
-        balances[to] = safeAdd(balances[to], amount);
-        emit Transfer(account, to, amount);
+    function transferFrom(address tokenOwner, address receiver, uint256 amount) public override returns (bool) {
+        balances[tokenOwner] = balances[tokenOwner].sub(amount);
+        allowed[tokenOwner][msg.sender] = allowed[tokenOwner][msg.sender].sub(amount);
+        balances[receiver] = balances[receiver].add(amount);
+        emit Transfer(tokenOwner, receiver, amount);
         return true;
     }
 
     // ------------------------------------------------------------------------
-    // Returns the amount of amount approved by the owner that can be
-    // transferred to the spender's account
-    // ------------------------------------------------------------------------
-    function allowance(address account, address spender) public override view returns (uint256 remaining) {
-        return allowed[account][spender];
-    }
-
-    // ------------------------------------------------------------------------
-    // Token owner can approve for spender to transferFrom(...) amount
+    // Token owner can approve for delegate to transferFrom(...) amount
     // from the token owner's account. The spender contract function
     // receiveApproval(...) is then executed
     // ------------------------------------------------------------------------
-    function approveAndCall(address spender, uint256 amount, bytes memory data) public returns (bool success) {
-        allowed[msg.sender][spender] = amount;
-        emit Approval(msg.sender, spender, amount);
-        ApproveAndCallFallBack(spender).receiveApproval(msg.sender, amount, address(this), data);
+    function approveAndCall(address delegate, uint256 amount, bytes memory data) public returns (bool) {
+        allowed[msg.sender][delegate] = amount;
+        emit Approval(msg.sender, delegate, amount);
+        ApproveAndCallFallBack(delegate).receiveApproval(msg.sender, amount, address(this), data);
         return true;
     }
 
@@ -200,10 +195,10 @@ contract CMGCoin is ERC20Interface, Owned, SafeMath {
     // ------------------------------------------------------------------------
     // Destroy amount
     // ------------------------------------------------------------------------
-    function burn(uint256 amount) public onlyOwner returns (bool success) {
-        balances[msg.sender] = safeSub(balances[msg.sender], amount * 10 ** uint256(_decimals));
-        _totalSupply -= amount * 10 ** uint256(_decimals);
-        emit Burn(msg.sender, amount * 10 ** uint256(_decimals));
+    function burn(uint256 amount) public onlyOwner returns (bool) {
+        balances[msg.sender] = balances[msg.sender].sub(amount);
+        _totalSupply = _totalSupply.sub(amount);
+        emit Burn(msg.sender, amount);
         return true;
     }
 }
