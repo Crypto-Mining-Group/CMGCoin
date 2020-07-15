@@ -20,15 +20,18 @@ library SafeMath {
 // https://eips.ethereum.org/EIPS/eip-20
 // ----------------------------------------------------------------------------
 abstract contract ERC20Interface {
+    function name() virtual public view returns (string memory);
+    function symbol() virtual public view returns (string memory);
+    function decimals() virtual public view returns (uint8);
     function totalSupply() virtual public view returns (uint256);
-    function balanceOf(address account) virtual public view returns (uint256 balance);
-    function allowance(address account, address spender) virtual public view returns (uint256 remaining);
-    function transfer(address to, uint256 amount) virtual public returns (bool success);
-    function approve(address spender, uint256 amount) virtual public returns (bool success);
-    function transferFrom(address account, address to, uint256 amount) virtual public returns (bool success);
+    function balanceOf(address account) virtual public view returns (uint256);
+    function transfer(address receiver, uint256 amount) virtual public returns (bool);
+    function approve(address delegate, uint256 amount) virtual public returns (bool);
+    function allowance(address tokenOwner, address delegate) virtual public view returns (uint256);
+    function transferFrom(address tokenOwner, address receiver, uint256 amount) virtual public returns (bool);
 
     event Transfer(address indexed from, address indexed to, uint256 amount);
-    event Approval(address indexed account, address indexed spender, uint256 amount);
+    event Approval(address indexed account, address indexed delegate, uint256 amount);
     event Burn(address indexed from, uint256 amount);
 }
 
@@ -50,10 +53,11 @@ contract Owned {
 
     constructor() public {
         owner = msg.sender;
+        emit OwnershipTransferred(address(0), owner);
     }
 
     modifier onlyOwner {
-        require(msg.sender == owner);
+        require(msg.sender == owner, "Caller is not owner");
         _;
     }
 
@@ -76,13 +80,10 @@ contract CMGCoin is ERC20Interface, Owned {
     mapping(address => uint256) balances;
     mapping(address => mapping(address => uint256)) allowed;
     
+    string private _name;
+    string private _symbol;
+    uint8 private _decimals;
     uint256 private _totalSupply;
-    
-    string public version = 'H1.0';
-    
-    string public _name;
-    string public _symbol;
-    uint8 public _decimals;
     
     // ------------------------------------------------------------------------
     // Constructor
@@ -96,21 +97,18 @@ contract CMGCoin is ERC20Interface, Owned {
         emit Transfer(address(0), msg.sender, _totalSupply);
     }
     
-    function name() public view returns (string memory) {
+    function name() public override view returns (string memory) {
         return _name;
     }
 
-    function symbol() public view returns (string memory) {
+    function symbol() public override view returns (string memory) {
         return _symbol;
     }
 
-    function decimals() public view returns (uint8) {
+    function decimals() public override view returns (uint8) {
         return _decimals;
     }
     
-    // ------------------------------------------------------------------------
-    // Total supply
-    // ------------------------------------------------------------------------
     function totalSupply() public override view returns (uint256) {
         return _totalSupply;
     }
